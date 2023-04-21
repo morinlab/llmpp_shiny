@@ -1,22 +1,23 @@
 library(shiny)
 library(tidyverse)
 
+
 # Define the fields we want to save from the form
 fields <- c("mutation","rb","user","tag","comment")
+
 shiny_log <- "shiny_responses.tsv"
 
 #try to get the git user ID
 get_user = function(){
-  user_res = system("git config --get user.email",intern=T)
-  user_res = str_remove(user_res,"@.+")
-  return(user_res)
+  # on the server automatically set a user ID that should be changed if users want their reviews logged
+  return("anonymous")
 }
+
 
 review_results = suppressMessages(read_tsv(shiny_log,col_names=fields))
 
 
 options_df = data.frame(full=dir(recursive=T,pattern=".png")) %>% 
-  filter(!grepl("Panea",full)) %>%
   mutate(base=basename(full)) %>%
   mutate(basename=base) %>% 
   separate(base,into=c("Region","End","Gene","sample_id","Ref","Alt"),sep="-+") %>% 
@@ -40,43 +41,49 @@ save_data=function(data){
 }
 
 ui <- fluidPage(
-  textOutput("todo"),
-  selectInput("gene", "Pick a Gene", choices = unique(options_df$Gene)),
-  actionButton("random", "Suggest a random gene"),
-  radioButtons("status","Which variants do you want to review?", choiceNames=list("Unreviewed","Reviewed"),choiceValues=list("unreviewed","reviewed")),
-  selectInput("mutation", "Pick a Mutation", choices = NULL),
-  
-  #tableOutput("data"),
-  radioButtons("rb", "Mutation quality:",width="100%",
-               choiceNames = list(
-                 "0: Zero support for the variant in the reads",
-                 "1: Minimal support and/or severe confounders",
-                 "2: Low support (2-3 molecules) or other confounders",
-                 "3: Modest support but some uncertainty or a confounder",
-                 "4: Good support",
-                 "5: Excellent support, no ambiguity"
-               ),
-               choiceValues = list("0", "1", "2","3","4","5")
-  ),
-  textInput("comment","Enter a comment (optional)"),
-  checkboxGroupInput(
-    "tag",
-    "Select any tags that apply (Optional)",
-    choiceNames = c("Adjacent indel","Ambiguous other","Directional",
-                    "Multiple Variants","Mononucleotide repeat","Dinucleotide repeat","Tandem repeat","Low Variant Frequency",
-                    "End of reads","High Discrepancy Region","Multiple Mismatches",
-                    "Low Mapping quality","Short Inserts Only",
-                    "Low Count Tumor","Same Start End",
-                    "Low Count Normal","No Count Normal","Tumor in Normal"),
-    choiceValues = c("AI","AO","D","MV","MN","DN","TR","LVF",
-                     "E","HDR","MM","LM","SIO","LCT","SSE",
-                     "LCN","NCN","TN"),
-    selected = NULL
-    ,inline = T
-  ),
-  textInput("user", "What's your Github user ID?",value = get_user()),
-  actionButton("submit", "Submit your rating!"),
-  imageOutput("photo")
+  titlePanel("Welcome, Mutation Reviewer!"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("gene", "Choose a Gene or hit the button below", choices = unique(options_df$Gene)),
+      actionButton("random", "Suggest a random gene"),
+      radioButtons("status","Which group of variants do you want to review?", choiceNames=list("Unreviewed","Reviewed"),choiceValues=list("unreviewed","reviewed")),
+      selectInput("mutation", "Pick a Mutation", choices = NULL),
+      radioButtons("rb", "Mutation quality:",width="100%",
+                   choiceNames = list(
+                     "0: Zero support for the variant in the reads",
+                     "1: Minimal support and/or severe confounders",
+                     "2: Low support (2-3 molecules) or other confounders",
+                     "3: Modest support but some uncertainty or a confounder",
+                     "4: Good support",
+                     "5: Excellent support, no ambiguity"
+                   ),
+                   choiceValues = list("0", "1", "2","3","4","5")
+      ),
+      checkboxGroupInput(
+        "tag",
+        "Select any tags that apply (Optional)",
+        choiceNames = c("Adjacent indel","Ambiguous other","Directional",
+                        "Multiple Variants","Mononucleotide repeat","Dinucleotide repeat","Tandem repeat","Low Variant Frequency",
+                        "End of reads","High Discrepancy Region","Multiple Mismatches",
+                        "Low Mapping quality","Short Inserts Only",
+                        "Low Count Tumor","Same Start End",
+                        "Low Count Normal","No Count Normal","Tumor in Normal"),
+        choiceValues = c("AI","AO","D","MV","MN","DN","TR","LVF",
+                         "E","HDR","MM","LM","SIO","LCT","SSE",
+                         "LCN","NCN","TN"),
+        selected = NULL
+        ,inline = T
+      ),
+    tableOutput("leaderboard")
+    ),
+  mainPanel(
+    textInput("comment","Enter a comment (optional)"),
+    
+    textInput("user", "Please change this to your GitHub user ID:",value = get_user()),
+    actionButton("submit", "Submit your rating!"),
+    imageOutput("photo")
+  )
+  )
 )
 server <- function(input, output, session) {
   # Whenever a field is filled, aggregate all form data
@@ -120,6 +127,11 @@ server <- function(input, output, session) {
   # When the Submit button is clicked, save the form data
   observeEvent(input$submit, {
     saved = save_data(formData())
+    output$leaderboard <- renderTable({
+      saved %>% group_by(user) %>% 
+        tally() %>% arrange(desc(n)) %>%
+        rename(c("Reviewer"="user","Submissions"="n"))
+    })
     choices = g() %>% 
       dplyr::filter(!basename %in% saved$mutation) %>%
       pull(basename) %>%
@@ -158,7 +170,11 @@ server <- function(input, output, session) {
     paste("Mutations unreviewed:",numleft)
     
   })
-  
+  #output$leaderboard <- renderTable({
+  #  review_results %>% group_by(user) %>% 
+  #    tally() %>% arrange(desc(n)) %>%
+  #    rename(c("Reviewer"="user","Submissions"="n"))
+  #})
   output$photo <- renderImage({
     req(input$mutation)
     full_path = g() %>% 
