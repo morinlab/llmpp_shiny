@@ -6,7 +6,10 @@ This repository contains the source code for two interactive Shiny sites that su
 
 ### Getting Started: Training & Calibration
 
-The reviewing will follow the guidelines detailed in [this paper](https://www.gimjournal.org/article/S1098-3600(21)00974-6/fulltext#ec0015) along with a streamlined scoring system we devised to simplify the process. Use [this page](https://shiny.rcg.sfu.ca/u/rdmorin/calibrate/) to learn the basics of the scoring system. Essentially, the system uses a 5-point scale to grade variants based on their quality. We also allow for variants to be given a score of 0 for when it has absolutely no evidence in the data according to IGV. This scenario should _theoretically_ never happen.
+The reviewing will follow the guidelines detailed in [this paper](https://www.gimjournal.org/article/S1098-3600(21)00974-6/fulltext#ec0015) along with a streamlined scoring system we devised to simplify the process. Use [this page](https://shiny.rcg.sfu.ca/u/rdmorin/calibrate/) to learn the basics of the scoring system. Essentially, the system uses a 5-point scale to grade variants based on their quality. 
+
+0. Our scoring scale allows for variants to be given a score of 0 for when it has absolutely no evidence in the data according to IGV. This scenario should _theoretically_ never happen.
+1. The assignment of 1 should be reseved for variants that appear to have
 
 ### Participating in Variant Review
 
