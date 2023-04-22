@@ -19,3 +19,10 @@ The reviewing will follow the guidelines detailed in [this paper](https://www.gi
 ### Participating in Variant Review
 
 When you are ready, use [this page](https://shiny.rcg.sfu.ca/u/rdmorin/llmpp_shiny/) to review the variants. The interface should be relatively self-explanatory. Be sure to enter a user ID in the box to avoid your submissions being tracked under `anonymous`. We recommend using the first part of the email address associated with your GitHub account (everything before the `@`). If you have done this correctly, your ID should appear on the leaderboard on the bottom of the side pane after you have submitted at least one review. 
+
+Things to note: 
+
+* None of the samples have a matched normal available. The page auto-selects the No count normal (NCN) tag for you to track this. 
+* Pretty much all libraries have a short insert size. This means that many of the candidate variants will be supported by overlapping F and R from the same pair. Try to take this into consideration when using the scoring and aim to consider how many distinct molecules support the mutation (rather than reads), when possible.
+* Some regions of certain genes have been noted to have evidence of contaminating PCR amplicon. Examples of what this looks like can be found [in the PubPeer post describing them](https://pubpeer.com/publications/E61AC72AE0402C6A62A84E36ED2AEA#1)
+
