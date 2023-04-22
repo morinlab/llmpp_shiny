@@ -18,7 +18,7 @@ The reviewing will follow the guidelines detailed in [this paper](https://www.gi
 
 ### Participating in Variant Review
 
-When you are ready, use [this page](https://shiny.rcg.sfu.ca/u/rdmorin/llmpp_shiny/) to review the variants. The interface should be relatively self-explanatory. Be sure to enter a user ID in the box to avoid your submissions being tracked under `anonymous`. We recommend using the first part of the email address associated with your GitHub account (everything before the `@`). If you have done this correctly, your ID should appear on the leaderboard on the bottom of the side pane after you have submitted at least one review. 
+Thanks for your interest in this crowdsourced effort to curate a set of variant calls of the highest possible quality. If done with sufficient care and rigor, we hope this work will enable subsequent analyses to uncover common sources of error in individual analysis pipelines. When you are ready, use [this page](https://shiny.rcg.sfu.ca/u/rdmorin/llmpp_shiny/) to review the variants. The interface should be relatively self-explanatory. Be sure to enter a user ID in the box to avoid your submissions being tracked under `anonymous`. We recommend using the first part of the email address associated with your GitHub account (everything before the `@`). If you have done this correctly, your ID should appear on the leaderboard on the bottom of the side pane after you have submitted at least one review. If we start seeing suspicious user IDs showing up we will restrict the leaderboard to only show white-listed IDs. Hopefully this will not become necessary.  
 
 Things to note: 
 
