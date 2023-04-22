@@ -19,7 +19,10 @@ Use [this page](https://shiny.rcg.sfu.ca/u/rdmorin/calibrate/) to see how other 
 
 ### Participating in Variant Review
 
-When you are ready, use [this page](https://shiny.rcg.sfu.ca/u/rdmorin/llmpp_shiny/) to review the variants. The interface should be relatively self-explanatory. Be sure to enter a user ID in the box to avoid your submissions being tracked under `anonymous`. We recommend using the first part of the email address associated with your GitHub account (everything before the `@`). If you have done this correctly, your ID should appear on the leaderboard on the bottom of the side pane after you have submitted at least one review. If we start seeing suspicious user IDs showing up we will restrict the leaderboard to only show white-listed IDs. Hopefully this will not become necessary.  
+When you are ready, use [this page](https://shiny.rcg.sfu.ca/u/rdmorin/llmpp_shiny/) to review the variants. The interface should be relatively self-explanatory. The only requirement for scoring a variant is that you select a score between 0 and 5 (realistically, usually between 1 and 5). The section of tags below are optional but using them is encouraged especially if you have downgraded a variant's score due to issues that can be described with the tags. If you want to note something not readily captured with a tag, feel free to enter a brief comment in the box provided.
+
+_When you start_, be sure to enter a user ID in the box to avoid your submissions being tracked under `anonymous`. We recommend using the first part of the email address associated with your GitHub account (everything before the `@`). If you have done this correctly, your ID should appear on the leaderboard on the bottom of the side pane after you have submitted at least one review. If we start seeing suspicious user IDs showing up we will restrict the leaderboard to only show white-listed IDs. Hopefully this will not become necessary. 
+
 
 Things to note: 
 
