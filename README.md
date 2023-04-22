@@ -18,4 +18,4 @@ The reviewing will follow the guidelines detailed in [this paper](https://www.gi
 
 ### Participating in Variant Review
 
-When you are ready, use [this page](https://shiny.rcg.sfu.ca/u/rdmorin/llmpp_shiny/) to review the variants. 
+When you are ready, use [this page](https://shiny.rcg.sfu.ca/u/rdmorin/llmpp_shiny/) to review the variants. The interface should be relatively self-explanatory. Be sure to enter a user ID in the box to avoid your submissions being tracked under `anonymous`. We recommend using the first part of the email address associated with your GitHub account (everything before the `@`). 
