@@ -18,14 +18,35 @@ review_results = suppressMessages(read_tsv(shiny_log,col_names=fields))
 
 
 options_df = data.frame(full=dir(recursive=T,pattern=".png")) %>% 
+  dplyr::filter(!grepl("pairs",full)) %>%
   mutate(base=basename(full)) %>%
   mutate(basename=base) %>% 
+  mutate(base=str_replace(base,"HLA-","HLA_")) %>%
+  mutate(base=str_replace(base,"MEF2BNB-","MEF2BNB_")) %>%
   separate(base,into=c("Region","End","Gene","sample_id","Ref","Alt"),sep="-+") %>% 
-  arrange(Gene)
+  mutate(chrpos=Region) %>%
+  separate(chrpos,into=c("Chromosome","Start"),sep=":") %>%
+  mutate(Start=as.numeric(Start)) %>%
+  arrange(Gene,Region)
+
+paired_df = data.frame(full=dir(recursive=T,pattern=".png")) %>% 
+  dplyr::filter(grepl("pairs",full)) %>%
+  mutate(base=basename(full)) %>%
+  mutate(basename=base) %>% 
+  mutate(base=str_replace(base,"HLA-","HLA_")) %>%
+  mutate(base=str_replace(base,"MEF2BNB-","MEF2BNB_")) %>%
+  mutate(base=str_remove(base,".pairs")) %>%
+  separate(base,into=c("Region","End","Gene","sample_id","Ref","Alt"),sep="-+") %>% 
+  mutate(chrpos=Region) %>%
+  separate(chrpos,into=c("Chromosome","Start"),sep=":") %>%
+  mutate(Start=as.numeric(Start)+1) %>%
+  arrange(Gene,Region)
+
+options_df = bind_rows(paired_df,options_df) %>% arrange(Gene,Region)
+
 
 
 save_data=function(data){
-
   if(class(data[["tag"]]) == "character"){
     data[["tag"]] = unlist(paste0(data[["tag"]],collapse=";"))
   }else{
@@ -170,24 +191,17 @@ server <- function(input, output, session) {
     paste("Mutations unreviewed:",numleft)
     
   })
-  #output$leaderboard <- renderTable({
-  #  review_results %>% group_by(user) %>% 
-  #    tally() %>% arrange(desc(n)) %>%
-  #    rename(c("Reviewer"="user","Submissions"="n"))
-  #})
+
   output$photo <- renderImage({
     req(input$mutation)
-    full_path = g() %>% 
-      filter(basename==input$mutation) %>%
-      pull(full)
-    #this seems to be running even if input$mutation is not set
-    #causing this error:
-    #'raw = FALSE' but './' is not a regular file
+    this_row = g() %>% 
+      filter(basename==input$mutation)
+    full_path = pull(this_row,full)
     list(
       src = paste0("./", full_path),
-      contentType = "image/png",
-      width = 1000,
-      height = 800
+      contentType = "image/png"
+      #width = w,
+      #height = 800
     )
   }, deleteFile = FALSE)
 }
