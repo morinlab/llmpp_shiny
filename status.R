@@ -83,23 +83,41 @@ server <- function(input, output, session) {
   
 
   output$graph1<-renderPlot({
-    r() %>% 
-      
-      ggplot(aes(x=Rating)) + 
-      geom_histogram(stat="count") +
-      #geom_col() + 
-      xlim(c(0,5)) + 
+    #zero value placeholder for filling in missing bins
+    blank_df = data.frame(Rating=c(0,1,2,3,4,5),n=c(0,0,0,0,0,0))
+    
+    #actual counts for bins with at least one value (some may be missing)
+    counted_df = r() %>% 
+      group_by(Rating) %>%
+      tally() 
+    
+    #bind the two and take the highest value per bin
+    bind_rows(blank_df,counted_df) %>% 
+      group_by(Rating) %>% 
+      arrange(desc(n)) %>% 
+      slice_head() %>%
+      ggplot(aes(x=Rating,y=n)) + 
+      geom_col() + 
       ggtitle(paste(input$gene, "SNVs from Reddy"))
   })
   
   output$graph2<-renderPlot({
-    g() %>% 
-      
-      ggplot(aes(x=Rating)) + 
-      geom_histogram(stat="count") +
-      #geom_col() + 
-      xlim(c(0,5)) + 
-      ggtitle(paste(input$gene,"SNVs from GAMBL"))
+    #zero value placeholder for filling in missing bins
+    blank_df = data.frame(Rating=c(0,1,2,3,4,5),n=c(0,0,0,0,0,0))
+    
+    #actual counts for bins with at least one value (some may be missing)
+    counted_df = g() %>% 
+      group_by(Rating) %>%
+      tally() 
+    
+    #bind the two and take the highest value per bin
+    bind_rows(blank_df,counted_df) %>% 
+      group_by(Rating) %>% 
+      arrange(desc(n)) %>% 
+      slice_head() %>%
+      ggplot(aes(x=Rating,y=n)) + 
+      geom_col() + 
+      ggtitle(paste(input$gene, "SNVs from GAMBL"))
   })
 }
 shinyApp(ui, server)
