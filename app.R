@@ -1,6 +1,6 @@
 library(shiny)
 library(tidyverse)
-
+library(shinyjs)
 
 # Define the fields we want to save from the form
 fields <- c("mutation","rb","user","tag","comment")
@@ -52,7 +52,7 @@ save_data=function(data){
   }else{
     data[["tag"]] = ""
   }
-
+  
   data <- data.frame(t(sapply(data,c)))
   colnames(data)=fields
   
@@ -62,6 +62,7 @@ save_data=function(data){
 }
 
 ui <- fluidPage(
+  useShinyjs(),
   titlePanel("Welcome, Mutation Reviewer!"),
   sidebarLayout(
     sidebarPanel(
@@ -95,15 +96,16 @@ ui <- fluidPage(
         selected = NULL
         ,inline = T
       ),
-    tableOutput("leaderboard")
+      tableOutput("leaderboard")
     ),
-  mainPanel(
-    textInput("comment","Enter a comment (optional)"),
-    
-    textInput("user", "Please change this to your GitHub user ID:",value = get_user()),
-    actionButton("submit", "Submit your rating!"),
-    imageOutput("photo")
-  )
+    mainPanel(
+      textInput("comment","Enter a comment (optional)"),
+      
+      textInput("user", "Please change this to your GitHub user ID:",value = get_user()),
+      hidden(div(id="username",radioButtons("userrev","Username?", choiceNames=list("rdmorin","HoumanLM","ninaliuta","callumcbrown","k.dreval","cmattsson","gillissierra","mannycruz","Elritch","hayashaalan","kcoyle","obigriffith"),choiceValues=list("rdmorin","HoumanLM","ninaliuta","callumcbrown","k.dreval","cmattsson","gillissierra","mannycruz","Elritch","hayashaalan","kcoyle","obigriffith"),inline = TRUE))),
+      actionButton("submit", "Submit your rating!"),
+      imageOutput("photo")
+    )
   )
 )
 server <- function(input, output, session) {
@@ -116,25 +118,28 @@ server <- function(input, output, session) {
   #radio button controlling how to subset the data
   subset = reactive({
     if(input$status=="reviewed"){
-      dplyr::filter(options_df,basename %in% review_results$mutation)
+      show("username")
+      newrev = filter(review_results, !(input$userrev == review_results$user))
+      dplyr::filter(options_df,basename %in% newrev$mutation)
     }else{
+      hide("username")
       dplyr::filter(options_df,!basename %in% review_results$mutation)
     }
   })
-
+  
   observeEvent(subset(), {
     choices <- unique(subset()$Gene)
     updateSelectInput(inputId = "gene", choices = choices) 
   })
   
   g = reactive({
-      subset() %>% dplyr::filter(Gene==input$gene)
+    subset() %>% dplyr::filter(Gene==input$gene)
   })
   observeEvent(g(), {
     choices <- unique(g()$basename)
     updateSelectInput(inputId = "mutation", choices = choices) 
   })
-
+  
   
   
   # randomly pick a gene for the user
@@ -160,15 +165,15 @@ server <- function(input, output, session) {
     updateSelectInput(inputId = "mutation", choices = choices) 
     updateRadioButtons(inputId="rb", 
                        label="Mutation quality:",
-                 choiceNames = list(
-                   "0: Zero support for the variant in the reads",
-                   "1: Minimal support and/or severe confounders",
-                   "2: Low support (2-3 molecules) or other confounders",
-                   "3: Modest support but some uncertainty or a confounder",
-                   "4: Good support",
-                   "5: Excellent support, no ambiguity"
-                 ),
-                 choiceValues = list("0", "1", "2","3","4","5")
+                       choiceNames = list(
+                         "0: Zero support for the variant in the reads",
+                         "1: Minimal support and/or severe confounders",
+                         "2: Low support (2-3 molecules) or other confounders",
+                         "3: Modest support but some uncertainty or a confounder",
+                         "4: Good support",
+                         "5: Excellent support, no ambiguity"
+                       ),
+                       choiceValues = list("0", "1", "2","3","4","5")
     )
     updateCheckboxGroupInput(inputId="tag",
                              label="Select any tags that apply (Optional)",
@@ -191,7 +196,7 @@ server <- function(input, output, session) {
     paste("Mutations unreviewed:",numleft)
     
   })
-
+  
   output$photo <- renderImage({
     req(input$mutation)
     this_row = g() %>% 

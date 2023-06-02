@@ -22,7 +22,7 @@ options_df = data.frame(full=dir(recursive=T,pattern=".png")) %>%
 review_all = full_join(options_df,review_results,by=c("basename"="mutation")) %>% 
   mutate(Start=as.numeric(Start),End=as.numeric(End)) %>%
   mutate(Start_Position = Start + 200) 
-
+View(review_results)
 #match up calls reported in Reddy study so they can be handled on their own
 reddy_annotated = read_tsv("data/reddy_snv_all_reannotated.maf.gz")
 
@@ -30,8 +30,8 @@ reddy_annotated = read_tsv("data/reddy_snv_all_reannotated.maf.gz")
 
 annotated_from_reddy = left_join(select(review_all,-Gene),
                                  reddy_annotated,by=c("sample_id"="Tumor_Sample_Barcode",
-                                                                 "Chromosome"="Chromosome",
-                                                                 "Start_Position"="Start_Position")) %>%
+                                                      "Chromosome"="Chromosome",
+                                                      "Start_Position"="Start_Position")) %>%
   filter(!is.na(Hugo_Symbol),!is.na(User))
 
 #match up calls from GAMBL so they can be handled on their own
@@ -60,8 +60,26 @@ ui <- fluidPage(
     ),
     mainPanel(
       #tableOutput("all_reviews"),
-      plotOutput("graph1"),
-      plotOutput("graph2")
+      tags$style(
+        ".calc1{
+        color:red;
+        position:absolute;
+        margin-left: -220px;
+        margin-top: -200px
+        }
+        .calc2{
+        color:blue;
+        position: absolute;
+        margin-left: -220px;
+        margin-top: -215px
+        }
+        "
+      ),
+      div(plotOutput("graph1")),
+      div(class="calc1", textOutput("calc1")),
+      br(),
+      div(plotOutput("graph2")),
+      div(class="calc2", textOutput("calc2"))
     )
   )
 )
@@ -81,7 +99,7 @@ server <- function(input, output, session) {
     }
   })
   
-
+  
   output$graph1<-renderPlot({
     #zero value placeholder for filling in missing bins
     blank_df = data.frame(Rating=c(0,1,2,3,4,5),n=c(0,0,0,0,0,0))
@@ -91,16 +109,36 @@ server <- function(input, output, session) {
       group_by(Rating) %>%
       tally() 
     
+    #Calculating mean and median
+    med_data = rep(counted_df$Rating, counted_df$n)
+    mean_df = mean(med_data)
+    median_df = median(med_data)
+    
     #bind the two and take the highest value per bin
     bind_rows(blank_df,counted_df) %>% 
       group_by(Rating) %>% 
       arrange(desc(n)) %>% 
       slice_head() %>%
-      ggplot(aes(x=Rating,y=n)) + 
+      ggplot(aes(x=factor(Rating),y=n)) + 
       geom_col() + 
       ggtitle(paste(input$gene, "SNVs from Reddy"))
   })
-  
+  output$calc1 <- renderText({ 
+    
+    #actual counts for bins with at least one value (some may be missing)
+    counted_df = r() %>% 
+      group_by(Rating) %>%
+      tally()
+    
+    #Calculating mean and median
+    med_data = rep(counted_df$Rating, counted_df$n)
+    mean_df = mean(med_data)
+    median_df = median(med_data)
+    
+    paste("Mean : ", round(mean_df, digits = 3),"Median : ", median_df)
+    
+  })
+
   output$graph2<-renderPlot({
     #zero value placeholder for filling in missing bins
     blank_df = data.frame(Rating=c(0,1,2,3,4,5),n=c(0,0,0,0,0,0))
@@ -108,17 +146,33 @@ server <- function(input, output, session) {
     #actual counts for bins with at least one value (some may be missing)
     counted_df = g() %>% 
       group_by(Rating) %>%
-      tally() 
+      tally()
     
+   
     #bind the two and take the highest value per bin
     bind_rows(blank_df,counted_df) %>% 
       group_by(Rating) %>% 
       arrange(desc(n)) %>% 
       slice_head() %>%
-      ggplot(aes(x=Rating,y=n)) + 
+      ggplot(aes(x=factor(Rating),y=n)) + 
       geom_col() + 
+      #annotate("text", x = 1, y = 1000, label = mean_df, col="blue", size= 4) +
       ggtitle(paste(input$gene, "SNVs from GAMBL"))
+  })
+  output$calc2 <- renderText({ 
+    
+    #actual counts for bins with at least one value (some may be missing)
+    counted_df = g() %>% 
+      group_by(Rating) %>%
+      tally()
+    
+    #Calculating mean and median
+    med_data = rep(counted_df$Rating, counted_df$n)
+    mean_df = mean(med_data)
+    median_df = median(med_data)
+    
+    paste("Mean : ", round(mean_df, digits = 3) ,"Median : ", median_df)
+  
   })
 }
 shinyApp(ui, server)
-
