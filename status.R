@@ -21,8 +21,12 @@ options_df = data.frame(full=dir(recursive=T,pattern=".png")) %>%
 
 review_all = full_join(options_df,review_results,by=c("basename"="mutation")) %>% 
   mutate(Start=as.numeric(Start),End=as.numeric(End)) %>%
-  mutate(Start_Position = Start + 200) 
-View(review_results)
+  mutate(Start_Position = Start + 200) %>% 
+  group_by(basename) %>%
+  mutate(Rating=mean(Rating)) %>%
+  slice_head(n=1) %>%
+  ungroup()
+#View(review_results)
 #match up calls reported in Reddy study so they can be handled on their own
 reddy_annotated = read_tsv("data/reddy_snv_all_reannotated.maf.gz")
 
