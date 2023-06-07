@@ -84,17 +84,27 @@ ui <- fluidPage(
       checkboxGroupInput(
         "tag",
         "Select any tags that apply (Optional)",
-        choiceNames = c("Adjacent indel","Ambiguous other","Directional",
-                        "Multiple Variants","Mononucleotide repeat","Dinucleotide repeat","Tandem repeat","Low Variant Frequency",
-                        "End of reads","High Discrepancy Region","Multiple Mismatches",
-                        "Low Mapping quality","Short Inserts Only",
-                        "Low Count Tumor","Same Start End",
-                        "Low Count Normal","No Count Normal","Tumor in Normal"),
-        choiceValues = c("AI","AO","D","MV","MN","DN","TR","LVF",
-                         "E","HDR","MM","LM","SIO","LCT","SSE",
-                         "LCN","NCN","TN"),
-        selected = NULL
-        ,inline = T
+        choiceNames = c("Adjacent indel: attributable to misalignment caused by a nearby insertion or deletion",
+                        "Directional: Variant is only/mostly found on reads in the same direction",
+                        "Multiple Variants: Variant appears multi-allelic, having read support for two or more non-reference alleles",
+                        "Low Variant Frequency: Low VAF in tumour",
+                        "End of reads: Variant is only seen within ~30 bp of end of all variant-supporting reads",
+                        "High Discrepancy Region (supported by reads that have other recurrent mismatches across the track)",
+                        "Multiple Mismatches: Variant is supported by reads that have other mismatched base pairs",
+                        "Low Mapping quality: Variant is mostly supported by reads that have low mapping quality",
+                        "Short Inserts Only: Variant is exclusively found on short fragments such that sequencing from each end results in overlapping reads",
+                        "Low Count Tumor: Variant has inadequate coverage in the tumour",
+                        "Same Start End: Variant is only observed in reads that start and stop at the same positions",
+                        "No Count Normal: No coverage in the matched normal or data from matched normal is unavailable",
+                        "Mononucleotide repeat: adjacent to a region in the genome that has a single-nucleotide repeat (e.g., AAAAAA…)",
+                        "Dinucleotide repeat: adjacent to a region in the genome that has two alternating nucleotides (e.g. TGTG...)",
+                        "Tandem repeat: adjacent to a region in the genome that has three or more alternating nucleotides (e.g., GTGGTGGTG…)",
+                        "Ambiguous other: surrounded by inconclusive genomic features that cannot be explained by other tags"),
+        choiceValues = c("AI","D","MV","LVF","E","HDR","MM","LM","SIO","LCT","SSE",
+                         "NCN","MN","DN","TR",
+                         "AO"),
+        selected = c("NCN")
+        ,inline = F
       ),
       tableOutput("leaderboard")
     ),
@@ -119,7 +129,8 @@ server <- function(input, output, session) {
   subset = reactive({
     if(input$status=="reviewed"){
       show("username")
-      newrev = filter(review_results, !(input$userrev == review_results$user))
+      oldrev = filter(review_results,input$userrev == review_results$user) %>% pull(mutation)
+      newrev = filter(review_results, !(review_results$mutation %in% oldrev)) %>% distinct(mutation)
       dplyr::filter(options_df,basename %in% newrev$mutation)
     }else{
       hide("username")
@@ -177,23 +188,36 @@ server <- function(input, output, session) {
     )
     updateCheckboxGroupInput(inputId="tag",
                              label="Select any tags that apply (Optional)",
-                             choiceNames = c("Adjacent indel","Ambiguous other","Directional",
-                                             "Multiple Variants","Mononucleotide repeat","Dinucleotide repeat",
-                                             "Tandem repeat","Low Variant Frequency",
-                                             "End of reads","High Discrepancy Region",
-                                             "Multiple Mismatches",
-                                             "Low Mapping quality","Short Inserts Only",
-                                             "Low Count Tumor","Same Start End",
-                                             "Low Count Normal","No Count Normal","Tumor in Normal"),
-                             choiceValues = c("AI","AO","D","MV","MN","DN","TR","LVF",
-                                              "E","HDR","MM","LM","SIO","LCT","SSE",
-                                              "LCN","NCN","TN"),
-                             selected = NULL
-                             ,inline = T)
+                             choiceNames = c("Adjacent indel: attributable to misalignment caused by a nearby insertion or deletion",
+                                             "Directional: Variant is only/mostly found on reads in the same direction",
+                                             "Multiple Variants: Variant appears multi-allelic, having read support for two or more non-reference alleles",
+                                             "Low Variant Frequency: Low VAF in tumour",
+                                             "End of reads: Variant is only seen within ~30 bp of end of all variant-supporting reads",
+                                             "High Discrepancy Region (supported by reads that have other recurrent mismatches across the track)",
+                                             "Multiple Mismatches: Variant is supported by reads that have other mismatched base pairs",
+                                             "Low Mapping quality: Variant is mostly supported by reads that have low mapping quality",
+                                             "Short Inserts Only: Variant is exclusively found on short fragments such that sequencing from each end results in overlapping reads",
+                                             "Low Count Tumor: Variant has inadequate coverage in the tumour",
+                                             "Same Start End: Variant is only observed in reads that start and stop at the same positions",
+                                             "No Count Normal: No coverage in the matched normal or data from matched normal is unavailable",
+                                             "Mononucleotide repeat: adjacent to a region in the genome that has a single-nucleotide repeat (e.g., AAAAAA…)",
+                                             "Dinucleotide repeat: adjacent to a region in the genome that has two alternating nucleotides (e.g. TGTG...)",
+                                             "Tandem repeat: adjacent to a region in the genome that has three or more alternating nucleotides (e.g., GTGGTGGTG…)",
+                                             "Ambiguous other: surrounded by inconclusive genomic features that cannot be explained by other tags"),
+                             choiceValues = c("AI","D","MV","LVF","E","HDR","MM","LM","SIO","LCT","SSE",
+                                              "NCN","MN","DN","TR",
+                                              "AO"),
+                             selected = "NCN",inline = F)
   })
+
   output$todo <- renderText({
-    numleft = subset() %>% nrow()
-    paste("Mutations unreviewed:",numleft)
+    req(input$mutation)
+    ref = options_df %>% filter(basename==input$mutation) %>% pull(Ref)
+    alt = options_df %>% filter(basename==input$mutation) %>% pull(Alt)
+    if(alt == "snapshot.png"){
+      alt="-"
+    }
+    paste0("variant: ",ref,">",alt)
     
   })
   
