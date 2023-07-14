@@ -130,7 +130,7 @@ server <- function(input, output, session) {
     if(input$status=="reviewed"){
       show("username")
       oldrev = filter(review_results,input$userrev == review_results$user) %>% pull(mutation)
-      newrev = filter(review_results, !(review_results$mutation %in% oldrev)) %>% distinct(mutation)
+      newrev <- filter(review_results, (!review_results$mutation %in% oldrev)) %>% distinct(mutation)
       dplyr::filter(options_df,basename %in% newrev$mutation)
     }else{
       hide("username")
@@ -164,15 +164,25 @@ server <- function(input, output, session) {
   # When the Submit button is clicked, save the form data
   observeEvent(input$submit, {
     saved = save_data(formData())
+    review_results <<- saved
+    View(review_results)
     output$leaderboard <- renderTable({
       saved %>% group_by(user) %>% 
         tally() %>% arrange(desc(n)) %>%
         rename(c("Reviewer"="user","Submissions"="n"))
     })
-    choices = g() %>% 
-      dplyr::filter(!basename %in% saved$mutation) %>%
-      pull(basename) %>%
-      unique()
+    if(input$status=="unreviewed"){
+      choices = g() %>%
+        dplyr::filter(!basename %in% saved$mutation) %>%
+        pull(basename) %>%
+        unique()
+    }else{
+      oldrev = filter(review_results,input$userrev == review_results$user) %>% pull(mutation)
+      newrev = filter(review_results, (!review_results$mutation %in% oldrev)) %>% distinct(mutation)
+      choices = g() %>%
+        dplyr::filter(basename %in% newrev$mutation) %>%
+        pull(basename)
+    }
     updateSelectInput(inputId = "mutation", choices = choices) 
     updateRadioButtons(inputId="rb", 
                        label="Mutation quality:",
