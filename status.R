@@ -7,6 +7,23 @@ fields <- c("mutation","Rating","User","tag","comment")
 review_results = suppressMessages(read_tsv(shiny_log,col_names=fields)) 
 
 
+fix_alt = function(Ref,Alt,kept_alt,basename){
+  case_when(
+    kept_alt == "snapshot.png" & str_detect(basename,paste0(Ref,"----")) ~ "-", #deletion
+    kept_alt == "snapshot.png" & str_detect(basename,paste0("----",Ref)) ~ Ref, #insertion
+    TRUE ~ Alt
+  )
+}
+
+fix_ref = function(Ref,Alt,kept_alt,basename){
+  case_when(
+    kept_alt == "snapshot.png" & str_detect(basename,paste0(Ref,"----")) ~ Ref, #deletion
+    kept_alt == "snapshot.png" & str_detect(basename,paste0("----",Ref)) ~ "-", #insertion
+    TRUE ~ Ref
+  )
+}
+
+# load the file names for screenshots of variants unique to Reddy or GAMBL (mostly)
 options_df = data.frame(full=dir(recursive=T,pattern=".png")) %>% 
   dplyr::filter(!grepl("pairs",full)) %>%
   mutate(base=basename(full)) %>%
@@ -17,8 +34,21 @@ options_df = data.frame(full=dir(recursive=T,pattern=".png")) %>%
   mutate(chrpos=Region) %>%
   separate(chrpos,into=c("Chromosome","Start"),sep=":") %>%
   mutate(Start=as.numeric(Start)) %>%
+  mutate(End = as.numeric(End)) %>%
+  mutate(gap=End-Start+1) %>%
+  mutate(Start_Position = case_when(gap ==402 ~ Start + 200,
+                                    gap > 150 ~ Start + 75,
+                                    TRUE ~ Start)) %>% 
+  mutate(kept_alt=Alt) %>%
+  #mutate(Ref=ifelse(grepl(paste0(kept_alt,"----"),basename),Ref,"-")) %>%
+  mutate(Alt=fix_alt(Ref,Alt,kept_alt,basename)) %>%
+  mutate(Ref=fix_ref(Ref,Alt,kept_alt,basename)) %>%
+  select(-kept_alt) %>%
   arrange(Gene,Region) 
 
+
+# load the file names for screenshots of variants shared by Reddy and GAMBL (mostly)
+#process slightly differnetly due to a change in the file naming 
 paired_df = data.frame(full=dir(recursive=T,pattern=".png")) %>% 
   dplyr::filter(grepl("pairs",full)) %>%
   mutate(base=basename(full)) %>%
@@ -30,38 +60,70 @@ paired_df = data.frame(full=dir(recursive=T,pattern=".png")) %>%
   mutate(chrpos=Region) %>%
   separate(chrpos,into=c("Chromosome","Start"),sep=":") %>%
   mutate(Start=as.numeric(Start)+1) %>%
+  mutate(End = as.numeric(End)) %>%
+  #mutate(Start_Position = Start) %>%
+  mutate(gap=End-Start+1) %>%
+  mutate(Start_Position = case_when(gap ==402 ~ Start + 200,
+                                    gap > 150 ~ Start + 75,
+                                    TRUE ~ Start)) %>% 
   arrange(Gene,Region)
 
 options_df = bind_rows(paired_df,options_df) %>% arrange(Gene,Region)
 
 
-
+# load all the variant reviews so they can be matched up to the original variant calls
 review_all = full_join(options_df,review_results,by=c("basename"="mutation")) %>% 
-  mutate(Start=as.numeric(Start),End=as.numeric(End)) %>%
-  mutate(Start_Position = Start + 200) %>% 
+  select(-full,-Region,-End,-Start,-gap,-comment,-tag) %>% 
+  unique() %>%
   group_by(basename) %>%
-  mutate(Rating=mean(Rating)) %>%
-  slice_head(n=1) %>%
-  ungroup() %>%
+  mutate(Mean_Rating=mean(Rating)) %>%
+  mutate(All_Rating=paste(Rating,collapse=",")) %>%
+  slice_head() %>% 
+  ungroup() %>% 
+  select(-User,-basename) %>%
+  filter(!Gene %in% c("MEF2BNB_MEF2B")) %>% 
   mutate(Chromosome = str_remove(Chromosome,pattern = "chr"))
-#View(review_results)
+    
+
+
 #match up calls reported in Reddy study so they can be handled on their own
+#This file is just the SNV
 reddy_annotated = read_tsv("data/reddy_snv_all_reannotated.maf.gz")
 
 
+#some are missing from this file. Use the one above instead.
+reddy_orig = read_tsv("data/mutations_reddy_original_annotations_reformatted.maf.gz") %>% 
+  mutate(Tumor_Sample_Barcode = paste0("Reddy_",Tumor_Sample_Barcode,"T")) %>% 
+  mutate(Chromosome = str_remove(Chromosome,"chr"))
+
+reddy_indel = filter(reddy_orig,Variant_Type != "SNP") %>% 
+  filter(!Hugo_Symbol %in% c("MEF2BNB-MEF2B")) %>% unique()
 
 
-annotated_from_reddy = left_join(select(review_all,-Gene),
+annotated_snv_from_reddy = left_join(select(review_all,-Gene),
                                  reddy_annotated,by=c("sample_id"="Tumor_Sample_Barcode",
                                                       "Chromosome"="Chromosome",
                                                       "Start_Position"="Start_Position")) %>%
-  filter(!is.na(Hugo_Symbol),!is.na(User))
+  filter(!is.na(Hugo_Symbol))
 
 
+annotated_indel_from_reddy = left_join(select(review_all,-Gene),
+                                       reddy_indel,by=c("sample_id"="Tumor_Sample_Barcode",
+                                                          "Chromosome"="Chromosome",
+                                                          "Start_Position"="Start_Position")) %>%
+  filter(!is.na(Hugo_Symbol)) %>% 
+  
+  unique()
+
+
+
+#write_tsv(select(review_all,Chromosome,Start_Position,Rating,User),file="all_reviews_Reddy.grch37.tsv")
 
 #match up calls from GAMBL so they can be handled on their own
 
 gambl_annotated = read_tsv("data/reddy_mutations_gambl_dlbclgenes.maf.gz") 
+gambl_annotated = group_by(gambl_annotated,Chromosome,Start_Position,Tumor_Sample_Barcode) %>% 
+  slice_head(n=1) %>% ungroup()
 
 #exclude indels since they aren't being matched properly anyway
 gambl_annotated = dplyr::filter(gambl_annotated,Variant_Type %in% c("SNP","DNP","TNP"))
@@ -75,29 +137,54 @@ reddy_annotated_in_gambl = left_join(dplyr::select(gambl_annotated,Chromosome,St
 annotated_intersect = inner_join(review_all,
                                 dplyr::select(reddy_annotated_in_gambl,-Gene),by=c("sample_id"="Tumor_Sample_Barcode",
                                                               "Chromosome"="Chromosome",
-                                                              "Start"="Start_Position")) 
-#%>%
+                                                              "Start_Position"="Start_Position")) 
+
+#annotated_from_gambl = left_join(select(review_all,-Gene),
+#                                 gambl_annotated,by=c("sample_id"="Tumor_Sample_Barcode",
+#                                                      "Chromosome"="Chromosome",
+#                                                      "Start_Position"="Start_Position")) %>%
 #  filter(!is.na(Hugo_Symbol),!is.na(User))
 
-annotated_from_gambl = left_join(select(review_all,-Gene),
-                                 gambl_annotated,by=c("sample_id"="Tumor_Sample_Barcode",
-                                                      "Chromosome"="Chromosome",
-                                                      "Start_Position"="Start_Position")) %>%
-  filter(!is.na(Hugo_Symbol),!is.na(User))
+
+#GAMBL variants not also covered by Reddy
+unannotated_from_gambl = anti_join(gambl_annotated,annotated_intersect,by=c("Tumor_Sample_Barcode"="sample_id",
+                                                                          "Chromosome"="Chromosome",
+                                                                          "Start_Position"="Start_Position"))
+annotated_from_gambl = inner_join(review_all,unannotated_from_gambl,by=c("sample_id"="Tumor_Sample_Barcode",
+                                                                         "Chromosome"="Chromosome",
+                                                                         "Start_Position"="Start_Position"))
+all_annotated_from_gambl = inner_join(review_all,gambl_annotated,by=c("sample_id"="Tumor_Sample_Barcode",
+                                                                         "Chromosome"="Chromosome",
+                                                                         "Start_Position"="Start_Position"))
+
+unreviewed = anti_join(gambl_annotated,review_all,by=c("Tumor_Sample_Barcode"="sample_id",
+                                                       "Chromosome"="Chromosome",
+                                                       "Start_Position"="Start_Position"))
+
+write_tsv(select(unreviewed,Hugo_Symbol,Chromosome,Start_Position,End_Position,Reference_Allele,Tumor_Seq_Allele2,Tumor_Sample_Barcode),file="unreviewed_gambl.maf")
+
+#save them for downstream analysis
 
 dplyr::select(annotated_from_gambl,-User,-Start,-End,-Ref,-Alt,-full,-Region,-basename) %>%
-  rename("sample_id"="Tumor_Sample_Barcode") %>%
-  write_tsv(file="gambl_only_mutations_with_review.maf")
+  dplyr::rename("Tumor_Sample_Barcode"="sample_id") %>%
+  write_tsv(file="gambl_mutations_with_review.maf")
 
 
 dplyr::select(annotated_from_reddy,-User,-Start,-End,-Ref,-Alt,-full,-Region,-basename) %>%
-  rename("sample_id"="Tumor_Sample_Barcode") %>%
-  write_tsv(file="reddy_only_mutations_with_review.maf")
+  dplyr::rename("Tumor_Sample_Barcode"="sample_id") %>%
+  write_tsv(file="reddy_mutations_with_review.maf")
 
 
 dplyr::select(annotated_intersect,-User,-Start,-End,-Ref,-Alt,-full,-Region,-basename) %>%
-  rename("sample_id"="Tumor_Sample_Barcode") %>%
+  dplyr::rename("Tumor_Sample_Barcode"="sample_id") %>%
   write_tsv(file="reddy_gambl_shared_mutations_with_review.maf")
+
+
+minimal_rating_info = bind_rows(dplyr::select(annotated_from_gambl,Chromosome,Start_Position,Reference_Allele,Tumor_Seq_Allele2,sample_id,Rating,tag,comment),
+          dplyr::select(annotated_intersect,Chromosome,Start_Position,Reference_Allele,Tumor_Seq_Allele2,sample_id,Rating,tag,comment),
+          dplyr::select(annotated_from_reddy,Chromosome,Start_Position,Reference_Allele,Tumor_Seq_Allele2,sample_id,Rating,tag,comment)) %>% unique()
+
+write_tsv(minimal_rating_info,file="manualreview--grch37--capture.tsv")
 
 annotated_from_gambl_score = dplyr::select(annotated_from_gambl,Hugo_Symbol,Rating) %>% mutate(group="GAMBL-only")
 annotated_from_reddy_score = dplyr::select(annotated_from_reddy,Hugo_Symbol,Rating) %>% mutate(group="Reddy-only")
