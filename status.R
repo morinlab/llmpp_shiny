@@ -129,8 +129,10 @@ gambl_annotated = group_by(gambl_annotated,Chromosome,Start_Position,Tumor_Sampl
 gambl_annotated = dplyr::filter(gambl_annotated,Variant_Type %in% c("SNP","DNP","TNP"))
 
 
-
-reddy_annotated_in_gambl = left_join(dplyr::select(gambl_annotated,Chromosome,Start_Position,Tumor_Sample_Barcode, Tumor_Seq_Allele2),reddy_annotated) %>%
+#this is the intersect
+reddy_annotated_in_gambl = left_join(dplyr::select(gambl_annotated,
+                                                   Chromosome,Start_Position,Tumor_Sample_Barcode, Tumor_Seq_Allele2),
+                                     reddy_annotated) %>%
   dplyr::filter(!is.na(Hugo_Symbol))
 
 
@@ -156,6 +158,24 @@ annotated_from_gambl = inner_join(review_all,unannotated_from_gambl,by=c("sample
 all_annotated_from_gambl = inner_join(review_all,gambl_annotated,by=c("sample_id"="Tumor_Sample_Barcode",
                                                                          "Chromosome"="Chromosome",
                                                                          "Start_Position"="Start_Position"))
+reddy_g = dplyr::filter(lymphoma_genes_dlbcl_v_latest,
+                        Reddy==TRUE) %>% pull(Gene)
+all_annotated_from_gambl_reddygenes = dplyr::filter(all_annotated_from_gambl,
+                                                    Hugo_Symbol %in% reddy_g)
+#This still includes the intersect. Need to remove the contents of annotated_intersect
+
+gambl_only_reddy_genes = anti_join(all_annotated_from_gambl_reddygenes,annotated_intersect,by=c("sample_id",
+                                                                                                "Start_Position",
+                                                                                                "Alt"))
+
+reddy_only_snv = anti_join(annotated_snv_from_reddy,annotated_intersect,by=c("sample_id",
+                                                                "Chromosome",
+                                                                "Start_Position"))
+
+reddy_only_indel = anti_join(annotated_indel_from_reddy,annotated_intersect,by=c("sample_id",
+                                                                             "Chromosome",
+                                                                             "Start_Position"))
+
 
 unreviewed = anti_join(gambl_annotated,review_all,by=c("Tumor_Sample_Barcode"="sample_id",
                                                        "Chromosome"="Chromosome",
@@ -163,21 +183,39 @@ unreviewed = anti_join(gambl_annotated,review_all,by=c("Tumor_Sample_Barcode"="s
 
 write_tsv(select(unreviewed,Hugo_Symbol,Chromosome,Start_Position,End_Position,Reference_Allele,Tumor_Seq_Allele2,Tumor_Sample_Barcode),file="unreviewed_gambl.maf")
 
+#SNV comparison
+reddy_only_snv = mutate(reddy_only_snv,group="Reddy_only")
+all_annotated_from_gambl = mutate(all_annotated_from_gambl,group="GAMBL_only")
+reddy_v_gambl_snv_rating = bind_rows(select(reddy_only_snv,Chromosome,Start_Position,sample_id,Mean_Rating,group),
+                                     select(all_annotated_from_gambl,Chromosome,Start_Position,sample_id,Mean_Rating,group))
+annotated_intersect = mutate(annotated_intersect,group="Intersect")
+threeway_compare = bind_rows(reddy_v_gambl_snv_rating,
+                             select(annotated_intersect,Start_Position,sample_id,Mean_Rating,group))
+#ggplot(reddy_v_gambl_snv_rating,aes(x=Mean_Rating)) + geom_histogram() + facet_wrap(~group,ncol=1,scales="free_y") + theme_cowplot()
+#ggsave("rating_SNV_comparison_Reddy_vs_GAMBL_no_intersect.pdf")
 #save them for downstream analysis
 
-dplyr::select(annotated_from_gambl,-User,-Start,-End,-Ref,-Alt,-full,-Region,-basename) %>%
+ggplot(threeway_compare,aes(x=Mean_Rating)) + geom_histogram() + facet_wrap(~group,ncol=1,scales="free_y") + theme_cowplot()
+ggsave("rating_SNV_comparison_Reddy_vs_GAMBL_with_intersect.pdf")
+
+
+dplyr::select(all_annotated_from_gambl_reddygenes,-Gene,-Ref,-Alt,-Rating,-coding_mutations,-MeanCorrectedCoverage) %>%
   dplyr::rename("Tumor_Sample_Barcode"="sample_id") %>%
-  write_tsv(file="gambl_mutations_with_review.maf")
+  write_tsv(file="gambl_only_mutations_in_Reddy_genes_with_review.maf")
 
-
-dplyr::select(annotated_from_reddy,-User,-Start,-End,-Ref,-Alt,-full,-Region,-basename) %>%
+dplyr::select(all_annotated_from_gambl,-Gene,-Ref,-Alt,-Rating,-coding_mutations,-MeanCorrectedCoverage) %>%
   dplyr::rename("Tumor_Sample_Barcode"="sample_id") %>%
-  write_tsv(file="reddy_mutations_with_review.maf")
+  write_tsv(file="gambl_only_mutations_lymphoma_genes_with_review.maf")
 
 
-dplyr::select(annotated_intersect,-User,-Start,-End,-Ref,-Alt,-full,-Region,-basename) %>%
+dplyr::select(reddy_only_snv,-Ref,-Alt) %>%
   dplyr::rename("Tumor_Sample_Barcode"="sample_id") %>%
-  write_tsv(file="reddy_gambl_shared_mutations_with_review.maf")
+  write_tsv(file="reddy_only_SNVs_with_review.maf")
+
+
+#dplyr::select(annotated_intersect) %>%
+  #dplyr::rename("Tumor_Sample_Barcode"="sample_id") %>%
+write_tsv(annotated_intersect,file="reddy_gambl_shared_mutations_with_review.maf")
 
 
 minimal_rating_info = bind_rows(dplyr::select(annotated_from_gambl,Chromosome,Start_Position,Reference_Allele,Tumor_Seq_Allele2,sample_id,Rating,tag,comment),
